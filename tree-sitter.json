@@ -1,0 +1,44 @@
+{
+  "grammars": [
+    {
+      "name": "mozcpp",
+      "camelcase": "MozCPP",
+      "scope": "source.cpp",
+      "path": ".",
+      "file-types": [
+        "cc",
+        "cpp",
+        "cxx",
+        "hpp",
+        "hxx",
+        "h"
+      ]
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "tree-sitter-cpp with Mozilla's (Gecko's) macros, for searchfox",
+    "authors": [
+      {
+        "name": "Calixte Denizet",
+        "email": "cdenizet@mozilla.com"
+      },
+      {
+        "name": "Andrew Sutherland",
+        "email": "asutherland@asutherland.org"
+      }
+    ],
+    "links": {
+      "repository": "https://github.com/mozsearch/tree-sitter-mozcpp"
+    }
+  },
+  "bindings": {
+    "c": false,
+    "go": false,
+    "node": false,
+    "python": false,
+    "rust": true,
+    "swift": false
+  }
+}

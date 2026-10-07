@@ -1,33 +1,21 @@
-// Adapted from tree-sitter-python bindings
-// -*- coding: utf-8 -*-
-// ------------------------------------------------------------------------------------------------
-// Copyright © 2021, tree-sitter-mozcpp authors.
-// See the LICENSE file in this repo for license details.
-// ------------------------------------------------------------------------------------------------
-
-//! This crate provides Mozcpp language support for the [tree-sitter][] parsing library.
-//!
-//! Typically, you will use the [LANGUAGE][] constant to add this language to a
-//! tree-sitter [Parser][], and then use the parser to parse some code:
+//! tree-sitter-cpp with Mozilla's (Gecko's) macros, for the [tree-sitter][]
+//! parsing library.  See the README for how it differs from tree-sitter-cpp.
 //!
 //! ```
-//! use tree_sitter::Parser;
-//!
 //! let code = r#"
-//! int double(int x) {
-//!     return x * 2;
+//! NS_IMETHODIMP
+//! Foo::Run() {
+//!   return NS_OK;
 //! }
 //! "#;
 //! let mut parser = tree_sitter::Parser::new();
-//! let language = tree_sitter_mozcpp::LANGUAGE;
 //! parser
-//!     .set_language(&language.into())
-//!     .expect("Error loading Mozcpp parser");
+//!     .set_language(&tree_sitter_mozcpp::LANGUAGE.into())
+//!     .expect("Error loading the mozcpp grammar");
 //! let tree = parser.parse(code, None).unwrap();
 //! assert!(!tree.root_node().has_error());
 //! ```
 //!
-//! [Parser]: https://docs.rs/tree-sitter/*/tree_sitter/struct.Parser.html
 //! [tree-sitter]: https://tree-sitter.github.io/
 
 use tree_sitter_language::LanguageFn;
@@ -41,12 +29,9 @@ extern "C" {
 /// [LanguageFn]: https://docs.rs/tree-sitter-language/*/tree_sitter_language/struct.LanguageFn.html
 pub const LANGUAGE: LanguageFn = unsafe { LanguageFn::from_raw(tree_sitter_mozcpp) };
 
-/// The source of the Mozjs tree-sitter grammar description.
-pub const GRAMMAR: &str = include_str!("../../grammar.js");
-
 /// The content of the [`node-types.json`][] file for this grammar.
 ///
-/// [`node-types.json`]: https://tree-sitter.github.io/tree-sitter/using-parsers#static-node-types
+/// [`node-types.json`]: https://tree-sitter.github.io/tree-sitter/using-parsers/6-static-node-types
 pub const NODE_TYPES: &str = include_str!("../../src/node-types.json");
 
 #[cfg(test)]
@@ -56,6 +41,6 @@ mod tests {
         let mut parser = tree_sitter::Parser::new();
         parser
             .set_language(&super::LANGUAGE.into())
-            .expect("Error loading Mozcpp parser");
+            .expect("Error loading the mozcpp grammar");
     }
 }

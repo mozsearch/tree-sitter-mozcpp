@@ -1,13 +1,16 @@
 [package]
 name = "tree-sitter-mozcpp"
-description = "Mozcpp grammar for the tree-sitter parsing library"
-version = "0.20.4"
-authors = ["Calixte Denizet <cdenizet@mozilla.com>"]
+description = "tree-sitter-cpp with Mozilla's (Gecko's) macros, for searchfox"
+version = "0.1.0"
+authors = [
+  "Calixte Denizet <cdenizet@mozilla.com>",
+  "Andrew Sutherland <asutherland@asutherland.org>",
+]
 license = "MIT"
-readme = "bindings/rust/README.md"
-keywords = ["incremental", "parsing", "mozcpp"]
-categories = ["parsing", "text-editors"]
-repository = "https://github.com/mozilla/rust-code-analysis"
+readme = "README.md"
+keywords = ["incremental", "parsing", "tree-sitter", "cpp", "mozilla"]
+categories = ["parsing"]
+repository = "https://github.com/mozsearch/tree-sitter-mozcpp"
 edition = "2021"
 
 build = "bindings/rust/build.rs"
@@ -15,22 +18,18 @@ include = [
   "bindings/rust/*",
   "grammar.js",
   "src/*",
+  "src/tree_sitter/*",
+  "tree-sitter.json",
 ]
 
 [lib]
 path = "bindings/rust/lib.rs"
 
 [dependencies]
-tree-sitter-language="0.1.0"
+tree-sitter-language = "0.1"
 
 [build-dependencies]
-cc = "^1.0"
-# This dependency is not used at all for this crate, but it is here so that
-# dependabot can send notifications when there are updates for this grammar
-tree-sitter-cpp = "0.23.4"
-
-[package.metadata.cargo-udeps.ignore]
-build = ["tree-sitter-cpp"]
+cc = "1.2"
 
 [dev-dependencies]
-tree-sitter = "=0.25.3"
+tree-sitter = "0.26"
