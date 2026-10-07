@@ -9,15 +9,54 @@ tree-sitter-cpp: `grammar.js` extends tree-sitter-cpp's grammar.
 
 ## Differences from tree-sitter-cpp
 
-From rust-code-analysis's tree-sitter-mozcpp:
-- Top-level macros alone on their lines (`alone_macro`, ex: `NS_IMETHODIMP`,
-  and `alone_macro_call`, ex: `U_NAMESPACE_BEGIN(FOO)`).
-- Mozilla's annotation macros (`macro_annotation`, ex: `MOZ_CAN_RUN_SCRIPT`,
-  `MOZ_STACK_CLASS`) where tree-sitter-cpp takes storage class specifiers,
-  after parameter lists, and after `class`/`struct`.
+Gecko (and the libraries it vendors) use macros in ways that tree-sitter-cpp
+can't parse, which make it misparse whole files: ex: a class ending in
+`NS_DECL_ISUPPORTS` (no semicolon) followed by `};` never closes, so the rest of
+the file nests in it.  Rather than lists of macros, this grammar recognizes
+macros by their shapes, with its external scanner deciding which ALL-CAPS
+names are macros by what's around them (see `scan_macro_start` in
+`src/scanner.c`), so that the grammar doesn't have to consider each name as
+both a macro and ordinary code:
+- `macro_invocation`: statement-like macros on lines of their own, in
+  classes (`NS_DECL_ISUPPORTS`, `NS_INLINE_DECL_REFCOUNTING(Foo)`), namespaces
+  (`NS_IMPL_ISUPPORTS(Foo, nsIRunnable)`), and functions: an ALL-CAPS name
+  first on its line, with optional arguments, ending the line, and not
+  continued by the next line (ex: by `{` or `:`).  In classes, they can also
+  end with a semicolon (`DEFINE_SIZE_STATIC (6);`).
+- `macro_type_specifier`: macros that expand to declarations' types
+  (`NS_IMETHOD_(void) Foo();`, `static MOZ_THREAD_LOCAL(uint32_t) sFoo;`).
+- `macro_annotation`: annotation macros before declarations (`SQLITE_API int
+  foo();`, `MOZ_CAN_RUN_SCRIPT void Foo();`, but not `HANDLE h;`), after
+  `class` and `struct` (`class MOZ_STACK_CLASS Foo`), after pointers' `*`s
+  (`T* PROTOBUF_NONNULL foo()`), after declarations' types (`int XMLCALL
+  foo()`, but not `uint32_t SSRC() const`), before constructors (`MOZ_IMPLICIT
+  Foo(int aX) : mX(aX) {}`), and after declarators and functions' parameters
+  (`int mX MOZ_GUARDED_BY(mMutex);`, `void Foo() final MOZ_REQUIRES(mMutex);`).
+- Macros' arguments (`macro_arguments`) are tokens in balanced parentheses,
+  since they can be anything (ex: `REFLEXIVE_EQUALITY_OPERATORS(const
+  StaticAutoPtr<T>&, U*, lhs.get() == rhs, class T, class U)`).
 - Calls of macros whose first argument is a declaration
-  (`QM_TRY_INSPECT(const auto& foo, ...)`).
-- Windows types (`DWORD`, `HANDLE`, ...) as primitive types.
+  (`QM_TRY_INSPECT(const auto& foo, GetFoo());`).
+
+And fixes to tree-sitter-cpp 0.23.4:
+- Strings concatenated with macros in the middle (`"a" PRIu32 "b"`).
+- Lambdas' parenthesized and braced init-captures (`[self(self)]`).
+- Pointer-to-member calls with `->*` (`(this->*aMethod)()`).
+- Default arguments without declarators (`const Foo* = nullptr`).
+
+What it doesn't handle: preprocessor conditionals inside declarations or
+expressions (ex: `#ifdef DEBUG` in a constructor's initializers), which
+tree-sitter-cpp only parses around whole statements and declarations
+(searchfox's tokenizer parses only conditionals' first branches, blanking the
+rest, and then those separately); `"*/"` in `#define`s' strings; and macros
+with mixed-case names, ex: one that is a function's body.
+
+This was rust-code-analysis's tree-sitter-mozcpp, whose grammar listed
+Gecko's annotation macros (`MOZ_CAN_RUN_SCRIPT`, ...), `QM_TRY_*`-style
+macros, top-level macros alone on their lines, and Windows types (`DWORD`,
+...), but not class-scope macros (which it handled from 2019-12 to 2020-04).
+Its lists are replaced by the above, which also don't make those names
+keywords.
 
 ## Building
 

@@ -3,10 +3,10 @@
 //!
 //! ```
 //! let code = r#"
-//! NS_IMETHODIMP
-//! Foo::Run() {
-//!   return NS_OK;
-//! }
+//! class Foo final : public nsIRunnable {
+//!   NS_DECL_ISUPPORTS
+//!   NS_DECL_NSIRUNNABLE
+//! };
 //! "#;
 //! let mut parser = tree_sitter::Parser::new();
 //! parser

@@ -1,372 +1,297 @@
+/**
+ * tree-sitter-cpp with Mozilla's (Gecko's) macros: rules for the shapes macros
+ * take in Gecko and the libraries it vendors, rather than lists of macros.
+ * The external scanner decides which ALL-CAPS names are macros, by what's
+ * around them (see `scan_macro_start` in src/scanner.c), so that the grammar
+ * doesn't have to consider each name as both a macro and ordinary code.  See
+ * the README.
+ */
+
 const CPP = require("tree-sitter-cpp/grammar");
+// (Which tree-sitter-cpp extends.)
+const PREC = require("tree-sitter-c/grammar").PREC;
 
 module.exports = grammar(CPP, {
   name: 'mozcpp',
 
-  rules: {
+  externals: ($, original) => original.concat([
+    $._macro_line_start,
+    $._macro_statement_start,
+    $._type_macro_start,
+    $._specifier_annotation_start,
+    $._leading_annotation_start,
+    $._trailing_annotation_start,
+    $._constructor_annotation_start,
+    $._post_type_annotation_start,
+  ]),
 
+  // (For macro calls whose first argument is a declaration, lambdas'
+  // init-captures, default arguments without declarators, and concatenated
+  // strings, below.)
+  conflicts: ($, original) => original.concat([
+    [$._declarator, $.type_specifier, $.expression, $.call_expression],
+    [$.expression, $.call_expression],
+    [$._declarator, $.expression, $.call_expression],
+    [$.type_specifier, $.expression, $.call_expression],
+    [$.expression, $.call_expression, $.lambda_capture_initializer],
+    [$._abstract_declarator, $.optional_parameter_declaration],
+    [$.pointer_declarator, $.abstract_pointer_declarator],
+    [$._string, $.concatenated_string],
+  ]),
+
+  rules: {
     _top_level_item: ($, original) => choice(
-      $.alone_macro,
-      $.alone_macro_call,
       original,
+      $.macro_invocation,
+    ),
+
+    // (Namespaces' bodies, and functions'.)
+    _block_item: ($, original) => choice(
+      original,
+      $.macro_invocation,
     ),
 
     _field_declaration_list_item: ($, original) => choice(
       original,
-      $.macro_statement,
+      $.macro_invocation,
+      alias($._macro_statement, $.macro_invocation),
     ),
 
-    alone_macro: $ => /[_A-Z][_A-Z0-9]+\s*\n/,
-    alone_macro_call: $ => seq(
-      /[_A-Z][_A-Z0-9]+/,
-      '(',
-      optional(seq(/[_A-Z][_A-Z0-9]+/, repeat(seq(',', /[_A-Z][_A-Z0-9]+/)))),
-      ')',
-      '\n',
+    // A statement-like macro on a line of its own, ex: `NS_DECL_ISUPPORTS` or
+    // `NS_INLINE_DECL_REFCOUNTING_INHERITED(A, B)` in a class, or
+    // `NS_IMPL_ISUPPORTS(Foo, nsIRunnable)` in a namespace: an ALL-CAPS name
+    // first on its line, with optional arguments, ending the line (or, in
+    // classes, followed by a semicolon, ex: `DEFINE_SIZE_STATIC (6);`).
+    // (A `(` after a macro's name starts its arguments: the scanner checked.)
+    macro_invocation: $ => prec.right(seq(
+      $._macro_line_start,
+      field('name', $.identifier),
+      optional(field('arguments', $.macro_arguments)),
+    )),
+    _macro_statement: $ => seq(
+      $._macro_statement_start,
+      field('name', $.identifier),
+      optional(field('arguments', $.macro_arguments)),
+      ';',
     ),
 
-    class_specifier: $ => prec.right(seq(
-      'class',
-      repeat($.macro_annotation),
-      choice(
-        field('name', $._class_name),
-        seq(
-          optional(field('name', $._class_name)),
-          optional($.virtual_specifier),
-          optional($.base_class_clause),
-          field('body', $.field_declaration_list)
-        )
-      )
+    // Macros' arguments can be anything (ex: types, or `lhs.get() == rhs,
+    // class T`), so they're tokens, in balanced parentheses.
+    macro_arguments: $ => seq('(', repeat($._macro_token), ')'),
+    _macro_token: $ => choice(
+      $.macro_arguments,
+      $.identifier,
+      $.number_literal,
+      $.string_literal,
+      $.raw_string_literal,
+      $.char_literal,
+      $.primitive_type,
+      $.true,
+      $.false,
+      $.null,
+      $.this,
+      'auto', 'class', 'const', 'constexpr', 'decltype', 'delete', 'enum',
+      'explicit', 'final', 'friend', 'inline', 'long', 'mutable', 'new',
+      'noexcept', 'operator', 'override', 'private', 'protected', 'public',
+      'return', 'short', 'signed', 'sizeof', 'static', 'struct', 'template',
+      'typename', 'union', 'unsigned', 'virtual', 'volatile',
+      ',', ';', '::', '->', '->*', '.', '.*', '...', '?', ':', '+', '-', '*',
+      '/', '%', '&', '|', '^', '~', '!', '=', '<', '>', '[', ']', '{', '}',
+      '==', '!=', '<=', '>=', '&&', '||', '<<', '>>', '++', '--', '+=', '-=',
+      '*=', '/=', '%=', '&=', '|=', '^=', '<<=', '>>=', '<=>',
+    ),
+
+    // A macro that expands to a declaration's type, ex:
+    // `NS_IMETHOD_(void) Foo();` or `static MOZ_THREAD_LOCAL(uint32_t) sFoo;`.
+    type_specifier: ($, original) => choice(
+      original,
+      $.macro_type_specifier,
+    ),
+    macro_type_specifier: $ => seq(
+      $._type_macro_start,
+      field('name', $.identifier),
+      field('arguments', $.macro_arguments),
+    ),
+
+    // Annotation macros, ex: `SQLITE_API` and `MOZ_CAN_RUN_SCRIPT` before
+    // declarations, `MOZ_STACK_CLASS` after `class`, `PROTOBUF_NONNULL` after
+    // a pointer's `*`, `XMLCALL` after a declaration's type, and
+    // `MOZ_GUARDED_BY(mMutex)` and `MOZ_REQUIRES(mMutex)` after declarators and
+    // functions' parameters, and `MOZ_IMPLICIT` before constructors.
+    specifier_annotation: $ => prec.right(seq(
+      $._specifier_annotation_start,
+      field('name', $.identifier),
+      optional(field('arguments', $.macro_arguments)),
+    )),
+    leading_annotation: $ => prec.right(seq(
+      $._leading_annotation_start,
+      field('name', $.identifier),
+      optional(field('arguments', $.macro_arguments)),
+    )),
+    trailing_annotation: $ => prec.right(seq(
+      $._trailing_annotation_start,
+      field('name', $.identifier),
+      optional(field('arguments', $.macro_arguments)),
     )),
 
-    struct_specifier: $ => prec.right(seq(
-      'struct',
-      optional($.macro_annotation),
-      choice(
-        field('name', $._class_name),
-        seq(
-          optional(field('name', $._class_name)),
-          optional($.virtual_specifier),
-          optional($.base_class_clause),
-          field('body', $.field_declaration_list)
-        )
-      )
+    post_type_annotation: $ => seq(
+      $._post_type_annotation_start,
+      field('name', $.identifier),
+    ),
+    constructor_annotation: $ => prec.right(seq(
+      $._constructor_annotation_start,
+      field('name', $.identifier),
+      optional(field('arguments', $.macro_arguments)),
+    )),
+    _constructor_specifiers: ($, original) => choice(
+      original,
+      alias($.constructor_annotation, $.macro_annotation),
+      // (Ex: `SK_ALWAYS_INLINE constexpr explicit operator bool()`.)
+      alias($.specifier_annotation, $.macro_annotation),
+    ),
+
+    _declaration_specifiers: $ => prec.right(seq(
+      repeat(choice($._declaration_modifiers, alias($.specifier_annotation, $.macro_annotation))),
+      field('type', $.type_specifier),
+      repeat(choice($._declaration_modifiers, alias($.post_type_annotation, $.macro_annotation))),
     )),
 
-    parameter_list: ($, original) => seq(
-      original,
-      optional($.macro_annotation),
+    _class_declaration: $ => seq(
+      repeat(choice($.attribute_specifier, $.alignas_qualifier, alias($.leading_annotation, $.macro_annotation))),
+      optional($.ms_declspec_modifier),
+      repeat($.attribute_declaration),
+      $._class_declaration_item,
     ),
 
-    storage_class_specifier: ($, original) => choice(
-      original,
-      $.macro_annotation,
+    pointer_declarator: $ => prec.dynamic(1, prec.right(seq(
+      optional($.ms_based_modifier),
+      '*',
+      repeat($.ms_pointer_modifier),
+      repeat(choice($.type_qualifier, alias($.leading_annotation, $.macro_annotation))),
+      field('declarator', $._declarator),
+    ))),
+    pointer_field_declarator: $ => prec.dynamic(1, prec.right(seq(
+      optional($.ms_based_modifier),
+      '*',
+      repeat($.ms_pointer_modifier),
+      repeat(choice($.type_qualifier, alias($.leading_annotation, $.macro_annotation))),
+      field('declarator', $._field_declarator),
+    ))),
+
+    _function_declarator_seq: $ => seq(
+      field('parameters', $.parameter_list),
+      optional($._function_attributes_start),
+      optional($.ref_qualifier),
+      optional($._function_exception_specification),
+      optional($._function_attributes_end),
+      repeat(alias($.trailing_annotation, $.macro_annotation)),
+      optional($.trailing_return_type),
+      optional($._function_postfix),
+      // (Ex: `Foo() final MOZ_REQUIRES(mMutex)`.)
+      repeat(alias($.trailing_annotation, $.macro_annotation)),
     ),
 
+    declaration: $ => seq(
+      $._declaration_specifiers,
+      commaSep1(field('declarator', choice(
+        seq(
+          $._declarator,
+          repeat(alias($.trailing_annotation, $.macro_annotation)),
+          optional($.gnu_asm_expression),
+        ),
+        $.init_declarator,
+      ))),
+      ';',
+    ),
+
+    field_declaration: $ => seq(
+      $._declaration_specifiers,
+      commaSep(seq(
+        field('declarator', $._field_declarator),
+        repeat(alias($.trailing_annotation, $.macro_annotation)),
+        optional(choice(
+          $.bitfield_clause,
+          field('default_value', $.initializer_list),
+          seq('=', field('default_value', choice($.expression, $.initializer_list))),
+        )),
+      )),
+      optional($.attribute_specifier),
+      ';',
+    ),
+
+    parameter_declaration: $ => seq(
+      $._declaration_specifiers,
+      optional(field('declarator', choice(
+        $._declarator,
+        $._abstract_declarator,
+      ))),
+      repeat(choice($.attribute_specifier, alias($.trailing_annotation, $.macro_annotation))),
+    ),
+
+    // (tree-sitter-cpp requires a declarator, ex: `const Foo* = nullptr` isn't
+    // one.)
+    optional_parameter_declaration: $ => seq(
+      $._declaration_specifiers,
+      field('declarator', optional(choice($._declarator, $.abstract_reference_declarator, $._abstract_declarator))),
+      '=',
+      field('default_value', $.expression),
+    ),
+
+    // A call of a macro whose first argument is a declaration, ex:
+    // `QM_TRY_INSPECT(const auto& foo, GetFoo())`.
     call_expression: ($, original) => choice(
       original,
-      $._call_macro_with_decl_first_arg,
-    ),
-
-    _call_macro_with_decl_first_arg: $ => seq(
-      field('function', choice(
-        'CACHE_TRY_INSPECT',
-        'CACHE_TRY_UNWRAP',
-        'FORWARD',
-        'FORWARD_SET_ATTRIBUTE',
-        'IDB_TRY_INSPECT',
-        'IDB_TRY_UNWRAP',
-        'LS_TRY_INSPECT',
-        'LS_TRY_UNWRAP',
-        'SDB_TRY_INSPECT',
-        'SDB_TRY_UNWRAP',
-        'PS_GET',
-        'PS_GET_AND_SET',
-        'PS_GET_LOCKLESS',
-        'QM_TRY_INSPECT',
-        'QM_NOTEONLY_TRY_UNWRAP',
-        'QM_TRY_UNWRAP',
-        'QM_WARNONLY_TRY_UNWRAP',
-      )),
-      field('arguments', seq(
-        '(',
-        $.parameter_declaration,
-        ',',
-        commaSep(choice($._expression_not_binary, $.initializer_list)),
-        ')',
+      prec.dynamic(-1, seq(
+        field('function', $.identifier),
+        field('arguments', alias($.macro_declaration_argument_list, $.argument_list)),
       )),
     ),
-
-    macro_statement: $ => 'MOZ_DECL_USE_GUARD_OBJECT_NOTIFIER',
-    
-    macro_annotation: $ => choice(
-      'MOZ_ALLOCATOR',
-      'MOZ_ALLOW_TEMPORARY',
-      'MOZ_ALWAYS_INLINE',
-      'MOZ_ALWAYS_INLINE_EVEN_DEBUG',
-      'MOZ_ASAN_BLACKLIST',
-      'MOZ_CAN_RUN_SCRIPT',
-      'MOZ_CAN_RUN_SCRIPT_BOUNDARY',
-      'MOZ_CAN_RUN_SCRIPT_FOR_DEFINITION',
-      'MOZ_COLD',
-      'MOZ_FALLTHROUGH',
-      'MOZ_FORMAT_PRINTF',
-      'MOZ_HAVE_ANALYZER_NORETURN',
-      'MOZ_HAVE_ASAN_BLACKLIST',
-      'MOZ_HAVE_NEVER_INLINE',
-      'MOZ_HAVE_NORETURN',
-      'MOZ_HAVE_NORETURN_PTR',
-      'MOZ_HAVE_NO_SANITIZE_ATTR',
-      'MOZ_HAVE_SIGNED_OVERFLOW_SANITIZE_ATTR',
-      'MOZ_HAVE_UNSIGNED_OVERFLOW_SANITIZE_ATTR',
-      'MOZ_HEAP_ALLOCATOR',
-      'MOZ_HEAP_CLASS',
-      'MOZ_IMPLICIT',
-      'MOZ_INHERIT_TYPE_ANNOTATIONS_FROM_TEMPLATE_ARGS',
-      'MOZ_INIT_OUTSIDE_CTOR',
-      'MOZ_IS_CLASS_INIT',
-      'MOZ_IS_REFPTR',
-      'MOZ_IS_SMARTPTR_TO_REFCOUNTED',
-      'MOZ_MAYBE_UNUSED',
-      'MOZ_MAY_CALL_AFTER_MUST_RETURN',
-      'MOZ_MUST_OVERRIDE',
-      'MOZ_MUST_RETURN_FROM_CALLER_IF_THIS_IS_ARG',
-      'MOZ_MUST_USE',
-      'MOZ_MUST_USE_TYPE',
-      'MOZ_NEEDS_MEMMOVABLE_MEMBERS',
-      'MOZ_NEEDS_MEMMOVABLE_TYPE',
-      'MOZ_NEEDS_NO_VTABLE_TYPE',
-      'MOZ_NEVER_INLINE',
-      'MOZ_NEVER_INLINE_DEBUG',
-      'MOZ_NONHEAP_CLASS',
-      'MOZ_NONNULL',
-      'MOZ_NONNULL_RETURN',
-      'MOZ_NON_AUTOABLE',
-      'MOZ_NON_MEMMOVABLE',
-      'MOZ_NON_OWNING_REF',
-      'MOZ_NON_PARAM',
-      'MOZ_NON_TEMPORARY_CLASS',
-      'MOZ_NORETURN',
-      'MOZ_NORETURN_PTR',
-      'MOZ_NO_ADDREF_RELEASE_ON_RETURN',
-      'MOZ_NO_ARITHMETIC_EXPR_IN_ARGUMENT',
-      'MOZ_NO_DANGLING_ON_TEMPORARIES',
-      'MOZ_NO_SANITIZE_SIGNED_OVERFLOW',
-      'MOZ_NO_SANITIZE_UNSIGNED_OVERFLOW',
-      'MOZ_ONLY_USED_TO_AVOID_STATIC_CONSTRUCTORS',
-      'MOZ_OWNING_REF',
-      'MOZ_POP_DISABLE_NONTRIVIAL_UNION_WARNINGS',
-      'MOZ_PRETEND_NORETURN_FOR_STATIC_ANALYSIS',
-      'MOZ_PUSH_DISABLE_NONTRIVIAL_UNION_WARNINGS',
-      'MOZ_RAII',
-      'MOZ_REQUIRED_BASE_METHOD',
-      'MOZ_STACK_CLASS',
-      'MOZ_STATIC_CLASS',
-      'MOZ_STATIC_LOCAL_CLASS',
-      'MOZ_TEMPORARY_CLASS',
-      'MOZ_TRIVIAL_CTOR_DTOR',
-      'MOZ_TSAN_BLACKLIST',
-      'MOZ_UNSAFE_REF',
-      'MOZ_XPCOM_ABI',
-      'JS_PUBLIC_API',
+    macro_declaration_argument_list: $ => seq(
+      '(',
+      $.parameter_declaration,
+      repeat(seq(',', choice($.expression, $.initializer_list, $.compound_statement))),
+      ')',
     ),
 
-    primitive_type: $ => token(choice(
-      'APIENTRY',
-      'ATOM',
-      'BOOL',
-      'BOOLEAN',
-      'BYTE',
-      'CCHAR',
-      'CHAR',
-      'COLORREF',
-      'DWORD',
-      'DWORDLONG',
-      'DWORD_PTR',
-      'DWORD32',
-      'DWORD64',
-      'FLOAT',
-      'HACCEL',
-      'HALF_PTR',
-      'HANDLE',
-      'HBITMAP',
-      'HBRUSH',
-      'HCOLORSPACE',
-      'HCONV',
-      'HCONVLIST',
-      'HCURSOR',
-      'HDC',
-      'HDDEDATA',
-      'HDESK',
-      'HDROP',
-      'HDWP',
-      'HENHMETAFILE',
-      'HFILE',
-      'HFONT',
-      'HGDIOBJ',
-      'HGLOBAL',
-      'HHOOK',
-      'HICON',
-      'HINSTANCE',
-      'HKEY',
-      'HKL',
-      'HLOCAL',
-      'HMENU',
-      'HMETAFILE',
-      'HMODULE',
-      'HMONITOR',
-      'HPALETTE',
-      'HPEN',
-      'HRESULT',
-      'HRGN',
-      'HRSRC',
-      'HSZ',
-      'HWINSTA',
-      'HWND',
-      'INT',
-      'INT_PTR',
-      'INT8',
-      'INT16',
-      'INT32',
-      'INT64',
-      'LANGID',
-      'LCID',
-      'LCTYPE',
-      'LGRPID',
-      'LONG',
-      'LONGLONG',
-      'LONG_PTR',
-      'LONG32',
-      'LONG64',
-      'LPARAM',
-      'LPBOOL',
-      'LPBYTE',
-      'LPCOLORREF',
-      'LPCSTR',
-      'LPCVOID',
-      'LPCWSTR',
-      'LPDWORD',
-      'LPHANDLE',
-      'LPINT',
-      'LPLONG',
-      'LPSTR',
-      'LPTSTR',
-      'LPWOID',
-      'LPWORD',
-      'LPWSTR',
-      'LRESULT',
-      'PBOOL',
-      'PBOOLEAN',
-      'PBYTE',
-      'PCHAR',
-      'PCSTR',
-      'PCTSTR',
-      'PCWSTR',
-      'PDWORD',
-      'PDWORDLONG',
-      'PDWORD_PTR',
-      'PDWORD32',
-      'PDWORD64',
-      'PFLOAT',
-      'PHALF_PTR',
-      'PHANDLE',
-      'PHKEY',
-      'PINT',
-      'PINT_PTR',
-      'PINT8',
-      'PINT16',
-      'PINT32',
-      'PINT64',
-      'PLCID',
-      'PLONG',
-      'PLONGLONG',
-      'PLONG32',
-      'PLONG64',
-      'POINTER_32',
-      'POINTER_64',
-      'POINTER_SIGNED',
-      'POINTER_UNSIGNED',
-      'PSHORT',
-      'PSIZE_T',
-      'PSSIZE_T',
-      'PSTR',
-      'PTBYTE',
-      'PTCHAR',
-      'PTSTR',
-      'PUCHAR',
-      'PUHALF_PTR',
-      'PUINT',
-      'PUINT_PTR',
-      'PUINT8',
-      'PUINT16',
-      'PUINT32',
-      'PUINT64',
-      'PULONG',
-      'PULONGLONG',
-      'PULONG32',
-      'PULONG64',
-      'PUSHORT',
-      'PVOID',
-      'PWCHAR',
-      'PWORD',
-      'PWSTR',
-      'QWORD',
-      'SC_HANDLE',
-      'SC_LOCK',
-      'SERVICE_STATUS_HANDLE',
-      'SHORT',
-      'SIZE_T',
-      'SSIZE_T',
-      'TBYTE',
-      'TCHAR',
-      'UCHAR',
-      'UHALF_PTR',
-      'UINT',
-      'UINT_PTR',
-      'UINT8',
-      'UINT16',
-      'UINT32',
-      'UINT64',
-      'ULONG',
-      'ULONGLONG',
-      'ULONG_PTR',
-      'ULONG32',
-      'ULONG64',
-      'UNICODE_STRING',
-      'USHORT',
-      'USN',
-      'VOID',
-      'WCHAR',
-      'WORD',
-      'WPARAM',
-      'bool',
-      'char',
-      'int',
-      'float',
-      'double',
-      'void',
-      'size_t',
-      'ssize_t',
-      'intptr_t',
-      'uintptr_t',
-      'charptr_t',
-      'intmax_t',
-      'intptr_t',
-      'uintmax_t',
-      'uintptr_t',
-      'ptrdiff_t',
-      'max_align_t',
-      'wchar_t',
-      'sig_atomic_t',
-      ...[8, 16, 32, 64].map(n => `int${n}_t`),
-      ...[8, 16, 32, 64].map(n => `uint${n}_t`),
-      ...[8, 16, 32, 64].map(n => `char${n}_t`),
-      ...[8, 16, 32, 64].map(n => `int_fast${n}_t`),
-      ...[8, 16, 32, 64].map(n => `int_least${n}_t`),
-      ...[8, 16, 32, 64].map(n => `uint_fast${n}_t`),
-      ...[8, 16, 32, 64].map(n => `uint_least${n}_t`),
+    // (tree-sitter-cpp only has `=` initializers, not `[self(self)]` or
+    // `[self{self}]`.)
+    lambda_capture_initializer: $ => seq(
+      optional('&'),
+      optional('...'),
+      field('left', $.identifier),
+      choice(
+        seq('=', field('right', $.expression)),
+        field('right', choice($.argument_list, $.initializer_list)),
+      ),
+    ),
+
+    // (tree-sitter-cpp has `.*`, but not `->*`, ex: `(this->*aMethod)()`.)
+    field_expression: $ => seq(
+      prec(PREC.FIELD, seq(
+        field('argument', $.expression),
+        field('operator', choice('.', '.*', '->', '->*')),
+      )),
+      field('field', choice(
+        prec.dynamic(1, $._field_identifier),
+        alias($.qualified_field_identifier, $.qualified_identifier),
+        $.destructor_name,
+        $.template_method,
+        alias($.dependent_field_identifier, $.dependent_name),
+      )),
+    ),
+
+    // tree-sitter-cpp requires a string second (ex: `"a" B "c"` isn't one).
+    concatenated_string: $ => prec.right(seq(
+      choice(
+        seq($.identifier, choice($.string_literal, $.raw_string_literal)),
+        seq(
+          choice($.string_literal, $.raw_string_literal),
+          choice($.identifier, $.string_literal, $.raw_string_literal),
+        ),
+      ),
+      repeat(choice($.identifier, $.string_literal, $.raw_string_literal)),
     )),
-  }
+  },
 });
 
 function commaSep(rule) {

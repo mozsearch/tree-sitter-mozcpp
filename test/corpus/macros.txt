@@ -1,0 +1,440 @@
+================================================================================
+Statement-like macros in classes
+================================================================================
+
+class Foo final : public nsIRunnable {
+ public:
+  NS_DECL_THREADSAFE_ISUPPORTS
+  NS_DECL_NSIRUNNABLE  // nsIRunnable
+  NS_INLINE_DECL_REFCOUNTING_INHERITED(Foo, Runnable)
+  DEFINE_SIZE_STATIC (6);
+
+ private:
+  ~Foo() = default;
+};
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (class_specifier
+    (type_identifier)
+    (virtual_specifier)
+    (base_class_clause
+      (access_specifier)
+      (type_identifier))
+    (field_declaration_list
+      (access_specifier)
+      (macro_invocation
+        (identifier))
+      (macro_invocation
+        (identifier))
+      (comment)
+      (macro_invocation
+        (identifier)
+        (macro_arguments
+          (identifier)
+          (identifier)))
+      (macro_invocation
+        (identifier)
+        (macro_arguments
+          (number_literal)))
+      (access_specifier)
+      (function_definition
+        (function_declarator
+          (destructor_name
+            (identifier))
+          (parameter_list))
+        (default_method_clause)))))
+
+================================================================================
+Statement-like macros in namespaces, with any arguments
+================================================================================
+
+namespace mozilla {
+
+NS_IMPL_ISUPPORTS(Foo, nsIRunnable)
+REFLEXIVE_EQUALITY_OPERATORS(const StaticAutoPtr<T>&, U*, lhs.get() == rhs,
+                             class T, class U)
+MAKE_SLICES_AND_OPTIONS(I8, int8_t)
+
+NS_IMETHODIMP
+Foo::Run() { return NS_OK; }
+
+}  // namespace mozilla
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (namespace_definition
+    (namespace_identifier)
+    (declaration_list
+      (macro_invocation
+        (identifier)
+        (macro_arguments
+          (identifier)
+          (identifier)))
+      (macro_invocation
+        (identifier)
+        (macro_arguments
+          (identifier)
+          (identifier)
+          (identifier)
+          (identifier)
+          (identifier)
+          (macro_arguments)
+          (identifier)
+          (identifier)
+          (identifier)))
+      (macro_invocation
+        (identifier)
+        (macro_arguments
+          (identifier)
+          (primitive_type)))
+      (macro_invocation
+        (identifier))
+      (function_definition
+        (function_declarator
+          (qualified_identifier
+            (namespace_identifier)
+            (identifier))
+          (parameter_list))
+        (compound_statement
+          (return_statement
+            (identifier))))))
+  (comment))
+
+================================================================================
+Macros continued by the next line aren't statements
+================================================================================
+
+FOO(x)
+    : mX(x) {}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (function_definition
+    (function_declarator
+      (identifier)
+      (parameter_list
+        (parameter_declaration
+          (type_identifier))))
+    (field_initializer_list
+      (field_initializer
+        (field_identifier)
+        (argument_list
+          (identifier))))
+    (compound_statement)))
+
+================================================================================
+Type macros
+================================================================================
+
+class Foo {
+  NS_IMETHOD_(void) DeleteCycleCollectable() override;
+  static MOZ_THREAD_LOCAL(uint32_t) sSequenceNumber;
+};
+
+NS_IMETHODIMP_(MozExternalRefCountType) Foo::Release() { return 0; }
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (class_specifier
+    (type_identifier)
+    (field_declaration_list
+      (field_declaration
+        (macro_type_specifier
+          (identifier)
+          (macro_arguments
+            (primitive_type)))
+        (function_declarator
+          (field_identifier)
+          (parameter_list)
+          (virtual_specifier)))
+      (field_declaration
+        (storage_class_specifier)
+        (macro_type_specifier
+          (identifier)
+          (macro_arguments
+            (primitive_type)))
+        (field_identifier))))
+  (function_definition
+    (macro_type_specifier
+      (identifier)
+      (macro_arguments
+        (identifier)))
+    (function_declarator
+      (qualified_identifier
+        (namespace_identifier)
+        (identifier))
+      (parameter_list))
+    (compound_statement
+      (return_statement
+        (number_literal)))))
+
+================================================================================
+Annotation macros
+================================================================================
+
+SQLITE_API int sqlite3_foo(void);
+static MOZ_ALWAYS_INLINE bool Bar() { return true; }
+class MOZ_CAPABILITY("monitor") Monitor final {
+  Mutex mMutex MOZ_UNANNOTATED;
+  int mX MOZ_GUARDED_BY(mMutex);
+  void Lock() MOZ_CAPABILITY_ACQUIRE();
+  std::string* PROTOBUF_NONNULL mutable_name() ABSL_ATTRIBUTE_LIFETIME_BOUND;
+};
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (declaration
+    (macro_annotation
+      (identifier))
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list
+        (parameter_declaration
+          (primitive_type)))))
+  (function_definition
+    (storage_class_specifier)
+    (macro_annotation
+      (identifier))
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list))
+    (compound_statement
+      (return_statement
+        (true))))
+  (class_specifier
+    (macro_annotation
+      (identifier)
+      (macro_arguments
+        (string_literal
+          (string_content))))
+    (type_identifier)
+    (virtual_specifier)
+    (field_declaration_list
+      (field_declaration
+        (type_identifier)
+        (field_identifier)
+        (macro_annotation
+          (identifier)))
+      (field_declaration
+        (primitive_type)
+        (field_identifier)
+        (macro_annotation
+          (identifier)
+          (macro_arguments
+            (identifier))))
+      (field_declaration
+        (primitive_type)
+        (function_declarator
+          (field_identifier)
+          (parameter_list)
+          (macro_annotation
+            (identifier)
+            (macro_arguments))))
+      (field_declaration
+        (qualified_identifier
+          (namespace_identifier)
+          (type_identifier))
+        (pointer_declarator
+          (macro_annotation
+            (identifier))
+          (function_declarator
+            (field_identifier)
+            (parameter_list)
+            (macro_annotation
+              (identifier))))))))
+
+================================================================================
+Macro calls whose first argument is a declaration
+================================================================================
+
+void Foo() {
+  QM_TRY_INSPECT(const auto& foo, GetFoo());
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (function_definition
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list))
+    (compound_statement
+      (expression_statement
+        (call_expression
+          (identifier)
+          (argument_list
+            (parameter_declaration
+              (type_qualifier)
+              (placeholder_type_specifier
+                (auto))
+              (reference_declarator
+                (identifier)))
+            (call_expression
+              (identifier)
+              (argument_list))))))))
+
+================================================================================
+Strings concatenated with macros
+================================================================================
+
+const char* kFoo = "PRAGMA page_size = %" PRIu32 ";";
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (declaration
+    (type_qualifier)
+    (primitive_type)
+    (init_declarator
+      (pointer_declarator
+        (identifier))
+      (concatenated_string
+        (string_literal
+          (string_content))
+        (identifier)
+        (string_literal
+          (string_content))))))
+
+================================================================================
+Default arguments without declarators
+================================================================================
+
+void RemoveChildNode(nsIContent* aKid, const BatchRemovalState* = nullptr);
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (declaration
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list
+        (parameter_declaration
+          (type_identifier)
+          (pointer_declarator
+            (identifier)))
+        (optional_parameter_declaration
+          (type_qualifier)
+          (type_identifier)
+          (abstract_pointer_declarator)
+          (null))))))
+
+================================================================================
+Annotations after functions' qualifiers and virtual specifiers, and types
+================================================================================
+
+class Foo {
+  uint32_t SSRC() const RTC_LOCKS_EXCLUDED(send_mutex_) { return ssrc_; }
+  const Chunk* Peek() final MOZ_CAPABILITY_ACQUIRE(mMutex) { return nullptr; }
+  SK_ALWAYS_INLINE constexpr explicit operator bool() const { return fValue; }
+};
+
+static int XMLCALL
+foo(int x) {
+  return x;
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (class_specifier
+    (type_identifier)
+    (field_declaration_list
+      (function_definition
+        (primitive_type)
+        (function_declarator
+          (field_identifier)
+          (parameter_list)
+          (type_qualifier)
+          (macro_annotation
+            (identifier)
+            (macro_arguments
+              (identifier))))
+        (compound_statement
+          (return_statement
+            (identifier))))
+      (function_definition
+        (type_qualifier)
+        (type_identifier)
+        (pointer_declarator
+          (function_declarator
+            (field_identifier)
+            (parameter_list)
+            (virtual_specifier)
+            (macro_annotation
+              (identifier)
+              (macro_arguments
+                (identifier)))))
+        (compound_statement
+          (return_statement
+            (null))))
+      (function_definition
+        (macro_annotation
+          (identifier))
+        (type_qualifier)
+        (explicit_function_specifier)
+        (operator_cast
+          (primitive_type)
+          (abstract_function_declarator
+            (parameter_list)
+            (type_qualifier)))
+        (compound_statement
+          (return_statement
+            (identifier))))))
+  (function_definition
+    (storage_class_specifier)
+    (primitive_type)
+    (macro_annotation
+      (identifier))
+    (function_declarator
+      (identifier)
+      (parameter_list
+        (parameter_declaration
+          (primitive_type)
+          (identifier))))
+    (compound_statement
+      (return_statement
+        (identifier)))))
+
+================================================================================
+Unions in fields, and members with ALL-CAPS names
+================================================================================
+
+struct Table {
+  union Type {
+    uint16_t raw;
+  } fsType;
+  HANDLE h;
+  FILE* f;
+};
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (struct_specifier
+    (type_identifier)
+    (field_declaration_list
+      (field_declaration
+        (union_specifier
+          (type_identifier)
+          (field_declaration_list
+            (field_declaration
+              (primitive_type)
+              (field_identifier))))
+        (field_identifier))
+      (field_declaration
+        (type_identifier)
+        (field_identifier))
+      (field_declaration
+        (type_identifier)
+        (pointer_declarator
+          (field_identifier))))))
