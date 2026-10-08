@@ -48,6 +48,11 @@ And fixes to tree-sitter-cpp 0.23.4:
 - Pointers to members in parentheses (`void (Foo::*mMethod)()`, `typedef
   void (Foo::*Method)();`, `void (Foo::*)()`), whose `pointer_declarator`s
   have their classes as `scope`s.
+- `delete[] *p` and `delete[] (p)` (whose `[]` were lambdas' captures).
+- Function pointers with calling conventions in classes (`nsresult
+  (__stdcall *mFunc)();`, which were declarations of functions `nsresult`).
+- Explicit instantiations of classes (`template class Foo<int>;`, which
+  were missing declarators) and `extern` ones.
 
 And Objective-C's expressions and statements, for Objective-C++'s C++
 (searchfox parses Objective-C++'s Objective-C declarations, ex:

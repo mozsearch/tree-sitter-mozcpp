@@ -45,6 +45,7 @@ module.exports = grammar(CPP, {
     [$.qualified_identifier, $._member_pointer_declarator],
     [$.qualified_identifier, $.qualified_type_identifier, $._member_pointer_declarator],
     [$.qualified_type_identifier, $._abstract_member_pointer_declarator],
+    [$._declaration_modifiers, $.template_instantiation],
   ]),
 
   rules: {
@@ -193,28 +194,36 @@ module.exports = grammar(CPP, {
     // Foo::*mField`, a declarator starting with a scope was ambiguous with
     // types and expressions, ex: `[] a` in `delete[] a[i];` was a lambda's
     // start.  And over tree-sitter-cpp's qualified names whose names are
-    // pointer declarators, which it has for them in some places.)
-    parenthesized_declarator: ($, original) => choice(
-      original,
-      prec.dynamic(PREC.PAREN_DECLARATOR, seq(
+    // pointer declarators, which it has for them in some places.)  And
+    // parenthesized declarators with calling conventions, ex: `nsresult
+    // (__stdcall *mFunc)();`, are preferred (with positive dynamic precedence,
+    // rather than tree-sitter-c's negative), as function pointers, over, ex, a
+    // declaration of a function `nsresult` with a parameter of type
+    // `__stdcall`.
+    parenthesized_declarator: $ => choice(
+      prec.dynamic(PREC.PAREN_DECLARATOR, seq('(', $._declarator, ')')),
+      prec.dynamic(1, seq('(', $.ms_call_modifier, $._declarator, ')')),
+      prec.dynamic(1, seq(
         '(',
         optional($.ms_call_modifier),
         alias($._member_pointer_declarator, $.pointer_declarator),
         ')',
       )),
     ),
-    parenthesized_field_declarator: ($, original) => choice(
-      original,
-      prec.dynamic(PREC.PAREN_DECLARATOR, seq(
+    parenthesized_field_declarator: $ => choice(
+      prec.dynamic(PREC.PAREN_DECLARATOR, seq('(', $._field_declarator, ')')),
+      prec.dynamic(1, seq('(', $.ms_call_modifier, $._field_declarator, ')')),
+      prec.dynamic(1, seq(
         '(',
         optional($.ms_call_modifier),
         alias($._member_pointer_field_declarator, $.pointer_declarator),
         ')',
       )),
     ),
-    parenthesized_type_declarator: ($, original) => choice(
-      original,
-      prec.dynamic(PREC.PAREN_DECLARATOR, seq(
+    parenthesized_type_declarator: $ => choice(
+      prec.dynamic(PREC.PAREN_DECLARATOR, seq('(', $._type_declarator, ')')),
+      prec.dynamic(1, seq('(', $.ms_call_modifier, $._type_declarator, ')')),
+      prec.dynamic(1, seq(
         '(',
         optional($.ms_call_modifier),
         alias($._member_pointer_type_declarator, $.pointer_declarator),
@@ -569,6 +578,27 @@ module.exports = grammar(CPP, {
         seq('=', field('right', $.expression)),
         field('right', choice($.argument_list, $.initializer_list)),
       ),
+    ),
+
+    // (`delete[]`'s `[` is a token of its own, so that its `[]` isn't a
+    // lambda's capture, which tree-sitter-cpp's precedence for them made it
+    // before `*` and `(`, ex: `delete[] *p;`.)
+    delete_expression: $ => seq(
+      optional('::'),
+      'delete',
+      optional(seq(alias(token(prec(1, '[')), '['), ']')),
+      $.expression,
+    ),
+
+    // (tree-sitter-cpp requires declarators, which explicit instantiations of
+    // classes don't have, ex: `template class Foo<int>;`, and doesn't have
+    // `extern` ones, ex: `extern template class Foo<int>;`.)
+    template_instantiation: $ => seq(
+      optional($.storage_class_specifier),
+      'template',
+      optional($._declaration_specifiers),
+      optional(field('declarator', $._declarator)),
+      ';',
     ),
 
     // (tree-sitter-cpp's `0` is an anonymous regex, which isn't in its trees,
