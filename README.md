@@ -44,6 +44,27 @@ And fixes to tree-sitter-cpp 0.23.4:
 - Pointer-to-member calls with `->*` (`(this->*aMethod)()`).
 - Default arguments without declarators (`const Foo* = nullptr`).
 
+And Objective-C's expressions and statements, for Objective-C++'s C++
+(searchfox parses Objective-C++'s Objective-C declarations, ex:
+`@implementation ... @end`, with tree-sitter-objc, and the rest with this):
+- `message_expression`: message sends (`[[NSFoo alloc] initWithName:aName
+  count:1]`, `[NSFoo class]`), whose receivers are names, messages,
+  casts, and calls, members, and subscripts of them, so that `[&self =
+  *this]` is still a lambda's capture and `[[clang::foo]]` an attribute.
+- Literals: `objc_string_literal` (`@"a"`, and concatenated, `@"a" @"b"`, a
+  `concatenated_string`), `selector_expression`,
+  `protocol_expression`, `encode_expression`, `boxed_expression` (`@(x)`,
+  `@1`, `@YES`), `array_literal`, `dictionary_literal`, and
+  `availability_expression` (`@available(macOS 11.0, *)`,
+  `__builtin_available(...)`).
+- Blocks: `block_literal` (`^{ ... }`, `^(id aX) { ... }`, `^BOOL(id aX) {
+  ... }`) and `block_pointer_declarator` (`void (^aCallback)(int)`).
+- Statements: `autoreleasepool_statement`, `objc_try_statement`,
+  `synchronized_statement`, `objc_throw_statement`, and `for_in_statement`
+  (`for (NSString* name in names)`).
+- ARC's and nullability's qualifiers (`__bridge`, `__weak`, `_Nullable`,
+  ...).
+
 What it doesn't handle: preprocessor conditionals inside declarations or
 expressions (ex: `#ifdef DEBUG` in a constructor's initializers), which
 tree-sitter-cpp only parses around whole statements and declarations

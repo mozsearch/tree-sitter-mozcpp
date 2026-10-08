@@ -1,0 +1,427 @@
+================================================================================
+Objective-C message sends
+================================================================================
+
+void Foo(NSArray* aArray) {
+  [mWindow orderOut:nil];
+  NSString* s = [[NSString alloc] initWithFormat:@"%d", 1];
+  id c = [NSFoo class];
+  [GetView() setFrame:aFrame display:YES];
+  [mView.window makeKeyWindow];
+  [funcConstants setConstantValue:&value
+                             type:MTLDataTypeBool];
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (function_definition
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list
+        (parameter_declaration
+          (type_identifier)
+          (pointer_declarator
+            (identifier)))))
+    (compound_statement
+      (expression_statement
+        (message_expression
+          (identifier)
+          (keyword_argument
+            (identifier)
+            (identifier))))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (pointer_declarator
+            (identifier))
+          (message_expression
+            (message_expression
+              (identifier)
+              (identifier))
+            (keyword_argument
+              (identifier)
+              (objc_string_literal
+                (string_literal
+                  (string_content))))
+            (number_literal))))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (identifier)
+          (message_expression
+            (identifier)
+            (identifier))))
+      (expression_statement
+        (message_expression
+          (call_expression
+            (identifier)
+            (argument_list))
+          (keyword_argument
+            (identifier)
+            (identifier))
+          (keyword_argument
+            (identifier)
+            (identifier))))
+      (expression_statement
+        (message_expression
+          (field_expression
+            (identifier)
+            (field_identifier))
+          (identifier)))
+      (expression_statement
+        (message_expression
+          (identifier)
+          (keyword_argument
+            (identifier)
+            (pointer_expression
+              (identifier)))
+          (keyword_argument
+            (identifier)
+            (identifier)))))))
+
+================================================================================
+Lambdas' captures, attributes, and message sends
+================================================================================
+
+[[clang::no_sanitize("float-divide-by-zero")]] bool Foo() {
+  auto f = [&self = *this, cutoffTime](int aX) { return aX; };
+  [[maybe_unused]] auto g = [this] { return 1; };
+  [[ns::Foo alloc] init];
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (function_definition
+    (attribute_declaration
+      (attribute
+        (identifier)
+        (identifier)
+        (argument_list
+          (string_literal
+            (string_content)))))
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list))
+    (compound_statement
+      (declaration
+        (placeholder_type_specifier
+          (auto))
+        (init_declarator
+          (identifier)
+          (lambda_expression
+            (lambda_capture_specifier
+              (lambda_capture_initializer
+                (identifier)
+                (pointer_expression
+                  (this)))
+              (identifier))
+            (abstract_function_declarator
+              (parameter_list
+                (parameter_declaration
+                  (primitive_type)
+                  (identifier))))
+            (compound_statement
+              (return_statement
+                (identifier))))))
+      (declaration
+        (attribute_declaration
+          (attribute
+            (identifier)))
+        (placeholder_type_specifier
+          (auto))
+        (init_declarator
+          (identifier)
+          (lambda_expression
+            (lambda_capture_specifier
+              (this))
+            (compound_statement
+              (return_statement
+                (number_literal))))))
+      (expression_statement
+        (message_expression
+          (message_expression
+            (qualified_identifier
+              (namespace_identifier)
+              (identifier))
+            (identifier))
+          (identifier))))))
+
+================================================================================
+Objective-C literals
+================================================================================
+
+void Foo() {
+  NSLog(@"Rebuilding video layer with "
+        @"AVSampleBufferDisplayLayer.");
+  SEL s = @selector(initWithFrame:styleMask:);
+  Protocol* p = @protocol(NSWindowDelegate);
+  id a = @[ @1, @(x), @YES ];
+  id d = @{@"key" : @"value"};
+  const char* e = @encode(int);
+  if (@available(macOS 11.0, *)) {
+  }
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (function_definition
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list))
+    (compound_statement
+      (expression_statement
+        (call_expression
+          (identifier)
+          (argument_list
+            (concatenated_string
+              (objc_string_literal
+                (string_literal
+                  (string_content)))
+              (objc_string_literal
+                (string_literal
+                  (string_content)))))))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (identifier)
+          (selector_expression
+            (identifier)
+            (identifier))))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (pointer_declarator
+            (identifier))
+          (protocol_expression
+            (identifier))))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (identifier)
+          (array_literal
+            (boxed_expression
+              (number_literal))
+            (boxed_expression
+              (identifier))
+            (boxed_expression
+              (identifier)))))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (identifier)
+          (dictionary_literal
+            (dictionary_pair
+              (objc_string_literal
+                (string_literal
+                  (string_content)))
+              (objc_string_literal
+                (string_literal
+                  (string_content)))))))
+      (declaration
+        (type_qualifier)
+        (primitive_type)
+        (init_declarator
+          (pointer_declarator
+            (identifier))
+          (encode_expression
+            (type_descriptor
+              (primitive_type)))))
+      (if_statement
+        (condition_clause
+          (availability_expression
+            (identifier)
+            (version_number)))
+        (compound_statement)))))
+
+================================================================================
+Objective-C blocks
+================================================================================
+
+void Foo() {
+  void (^handler)(NSEvent*) = ^(NSEvent* aEvent) {
+    [aEvent retain];
+  };
+  [items enumerateObjectsUsingBlock:^(id obj, NSUInteger idx, BOOL* stop) {
+  }];
+  id h = [c moxFindAncestor:^BOOL(id<MOXAccessible> moxAcc, BOOL* stop) {
+    return YES;
+  }];
+  dispatch_async(queue, ^{
+    Run();
+  });
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (function_definition
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list))
+    (compound_statement
+      (declaration
+        (primitive_type)
+        (init_declarator
+          (function_declarator
+            (parenthesized_declarator
+              (block_pointer_declarator
+                (identifier)))
+            (parameter_list
+              (parameter_declaration
+                (type_identifier)
+                (abstract_pointer_declarator))))
+          (block_literal
+            (parameter_list
+              (parameter_declaration
+                (type_identifier)
+                (pointer_declarator
+                  (identifier))))
+            (compound_statement
+              (expression_statement
+                (message_expression
+                  (identifier)
+                  (identifier)))))))
+      (expression_statement
+        (message_expression
+          (identifier)
+          (keyword_argument
+            (identifier)
+            (block_literal
+              (parameter_list
+                (parameter_declaration
+                  (type_identifier)
+                  (identifier))
+                (parameter_declaration
+                  (type_identifier)
+                  (identifier))
+                (parameter_declaration
+                  (type_identifier)
+                  (pointer_declarator
+                    (identifier))))
+              (compound_statement)))))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (identifier)
+          (message_expression
+            (identifier)
+            (keyword_argument
+              (identifier)
+              (block_literal
+                (type_descriptor
+                  (type_identifier)
+                  (abstract_function_declarator
+                    (parameter_list
+                      (parameter_declaration
+                        (template_type
+                          (type_identifier)
+                          (template_argument_list
+                            (type_descriptor
+                              (type_identifier))))
+                        (identifier))
+                      (parameter_declaration
+                        (type_identifier)
+                        (pointer_declarator
+                          (identifier))))))
+                (compound_statement
+                  (return_statement
+                    (identifier))))))))
+      (expression_statement
+        (call_expression
+          (identifier)
+          (argument_list
+            (identifier)
+            (block_literal
+              (compound_statement
+                (expression_statement
+                  (call_expression
+                    (identifier)
+                    (argument_list)))))))))))
+
+================================================================================
+Objective-C statements
+================================================================================
+
+void Foo(NSArray* aItems) {
+  @autoreleasepool {
+    for (NSString* name in aItems) {
+      Use(name);
+    }
+  }
+  @try {
+    [aItems lastObject];
+  } @catch (NSException* e) {
+    @throw;
+  } @finally {
+  }
+  @synchronized(self) {
+  }
+  CFStringRef r = (__bridge CFStringRef)name;
+  __block int count = 0;
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (function_definition
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list
+        (parameter_declaration
+          (type_identifier)
+          (pointer_declarator
+            (identifier)))))
+    (compound_statement
+      (autoreleasepool_statement
+        (compound_statement
+          (for_in_statement
+            (type_identifier)
+            (pointer_declarator
+              (identifier))
+            (identifier)
+            (compound_statement
+              (expression_statement
+                (call_expression
+                  (identifier)
+                  (argument_list
+                    (identifier))))))))
+      (objc_try_statement
+        (compound_statement
+          (expression_statement
+            (message_expression
+              (identifier)
+              (identifier))))
+        (objc_catch_clause
+          (parameter_declaration
+            (type_identifier)
+            (pointer_declarator
+              (identifier)))
+          (compound_statement
+            (objc_throw_statement)))
+        (compound_statement))
+      (synchronized_statement
+        (identifier)
+        (compound_statement))
+      (declaration
+        (type_identifier)
+        (init_declarator
+          (identifier)
+          (cast_expression
+            (type_descriptor
+              (type_qualifier)
+              (type_identifier))
+            (identifier))))
+      (declaration
+        (type_qualifier)
+        (primitive_type)
+        (init_declarator
+          (identifier)
+          (number_literal))))))
