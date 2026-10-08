@@ -460,3 +460,84 @@ class Foo {
           (parameter_list))
         (pure_virtual_clause
           (number_literal))))))
+
+================================================================================
+Pointers to members
+================================================================================
+
+class Runner {
+  void (Foo::*mMethod)();
+  typedef void (Foo::*Method)(int);
+  using Getter = bool (mozilla::dom::Element::*)() const;
+};
+void Call(void (Foo::*aMethod)(int), nsresult (__stdcall U::*aFunc)()) {
+  delete[] a[i];
+}
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (class_specifier
+    (type_identifier)
+    (field_declaration_list
+      (field_declaration
+        (primitive_type)
+        (function_declarator
+          (parenthesized_declarator
+            (pointer_declarator
+              (namespace_identifier)
+              (field_identifier)))
+          (parameter_list)))
+      (type_definition
+        (primitive_type)
+        (function_declarator
+          (parenthesized_declarator
+            (pointer_declarator
+              (namespace_identifier)
+              (type_identifier)))
+          (parameter_list
+            (parameter_declaration
+              (primitive_type)))))
+      (alias_declaration
+        (type_identifier)
+        (type_descriptor
+          (primitive_type)
+          (abstract_function_declarator
+            (abstract_parenthesized_declarator
+              (abstract_pointer_declarator
+                (namespace_identifier)
+                (namespace_identifier)
+                (namespace_identifier)))
+            (parameter_list)
+            (type_qualifier))))))
+  (function_definition
+    (primitive_type)
+    (function_declarator
+      (identifier)
+      (parameter_list
+        (parameter_declaration
+          (primitive_type)
+          (function_declarator
+            (parenthesized_declarator
+              (pointer_declarator
+                (namespace_identifier)
+                (identifier)))
+            (parameter_list
+              (parameter_declaration
+                (primitive_type)))))
+        (parameter_declaration
+          (type_identifier)
+          (function_declarator
+            (parenthesized_declarator
+              (ms_call_modifier)
+              (pointer_declarator
+                (namespace_identifier)
+                (identifier)))
+            (parameter_list)))))
+    (compound_statement
+      (expression_statement
+        (delete_expression
+          (subscript_expression
+            (identifier)
+            (subscript_argument_list
+              (identifier))))))))

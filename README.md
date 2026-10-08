@@ -45,6 +45,9 @@ And fixes to tree-sitter-cpp 0.23.4:
 - Default arguments without declarators (`const Foo* = nullptr`).
 - Pure virtual functions' `0` is a `number_literal` (an anonymous regex in
   tree-sitter-cpp, which isn't in its trees).
+- Pointers to members in parentheses (`void (Foo::*mMethod)()`, `typedef
+  void (Foo::*Method)();`, `void (Foo::*)()`), whose `pointer_declarator`s
+  have their classes as `scope`s.
 
 And Objective-C's expressions and statements, for Objective-C++'s C++
 (searchfox parses Objective-C++'s Objective-C declarations, ex:

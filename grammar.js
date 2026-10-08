@@ -42,6 +42,9 @@ module.exports = grammar(CPP, {
     [$.expression, $.call_expression, $.lambda_capture_initializer, $._message_receiver],
     [$.expression, $._message_receiver],
     [$.attribute, $._scope_resolution],
+    [$.qualified_identifier, $._member_pointer_declarator],
+    [$.qualified_identifier, $.qualified_type_identifier, $._member_pointer_declarator],
+    [$.qualified_type_identifier, $._abstract_member_pointer_declarator],
   ]),
 
   rules: {
@@ -181,6 +184,75 @@ module.exports = grammar(CPP, {
       repeat($.ms_pointer_modifier),
       repeat(choice($.type_qualifier, alias($.leading_annotation, $.macro_annotation))),
       field('declarator', $._field_declarator),
+    ))),
+
+    // Pointers to members, which tree-sitter-cpp doesn't have, in parentheses,
+    // whose `*`s have their classes as scopes: `void (Foo::*mMethod)()`,
+    // `typedef void (Foo::*Method)();`, and `void (Foo::*)()`.  (Only in
+    // parentheses, where they nearly always are: elsewhere, ex: `int
+    // Foo::*mField`, a declarator starting with a scope was ambiguous with
+    // types and expressions, ex: `[] a` in `delete[] a[i];` was a lambda's
+    // start.  And over tree-sitter-cpp's qualified names whose names are
+    // pointer declarators, which it has for them in some places.)
+    parenthesized_declarator: ($, original) => choice(
+      original,
+      prec.dynamic(PREC.PAREN_DECLARATOR, seq(
+        '(',
+        optional($.ms_call_modifier),
+        alias($._member_pointer_declarator, $.pointer_declarator),
+        ')',
+      )),
+    ),
+    parenthesized_field_declarator: ($, original) => choice(
+      original,
+      prec.dynamic(PREC.PAREN_DECLARATOR, seq(
+        '(',
+        optional($.ms_call_modifier),
+        alias($._member_pointer_field_declarator, $.pointer_declarator),
+        ')',
+      )),
+    ),
+    parenthesized_type_declarator: ($, original) => choice(
+      original,
+      prec.dynamic(PREC.PAREN_DECLARATOR, seq(
+        '(',
+        optional($.ms_call_modifier),
+        alias($._member_pointer_type_declarator, $.pointer_declarator),
+        ')',
+      )),
+    ),
+    abstract_parenthesized_declarator: ($, original) => choice(
+      original,
+      prec(1, seq(
+        '(',
+        optional($.ms_call_modifier),
+        alias($._abstract_member_pointer_declarator, $.abstract_pointer_declarator),
+        ')',
+      )),
+    ),
+    _member_pointer_declarator: $ => prec.dynamic(2, prec.right(seq(
+      repeat1($._scope_resolution),
+      '*',
+      repeat($.type_qualifier),
+      field('declarator', $._declarator),
+    ))),
+    _member_pointer_field_declarator: $ => prec.dynamic(2, prec.right(seq(
+      repeat1($._scope_resolution),
+      '*',
+      repeat($.type_qualifier),
+      field('declarator', $._field_declarator),
+    ))),
+    _member_pointer_type_declarator: $ => prec.dynamic(2, prec.right(seq(
+      repeat1($._scope_resolution),
+      '*',
+      repeat($.type_qualifier),
+      field('declarator', $._type_declarator),
+    ))),
+    _abstract_member_pointer_declarator: $ => prec.dynamic(2, prec.right(seq(
+      repeat1($._scope_resolution),
+      '*',
+      repeat($.type_qualifier),
+      field('declarator', optional($._abstract_declarator)),
     ))),
 
     _function_declarator_seq: $ => seq(
