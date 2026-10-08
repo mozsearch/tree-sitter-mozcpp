@@ -499,6 +499,10 @@ module.exports = grammar(CPP, {
       ),
     ),
 
+    // (tree-sitter-cpp's `0` is an anonymous regex, which isn't in its trees,
+    // so its text was in no node.)
+    pure_virtual_clause: $ => seq('=', alias(/0/, $.number_literal), ';'),
+
     // (tree-sitter-cpp has `.*`, but not `->*`, ex: `(this->*aMethod)()`.)
     field_expression: $ => seq(
       prec(PREC.FIELD, seq(

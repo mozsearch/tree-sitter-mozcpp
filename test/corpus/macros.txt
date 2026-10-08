@@ -438,3 +438,25 @@ struct Table {
         (type_identifier)
         (pointer_declarator
           (field_identifier))))))
+
+================================================================================
+Pure virtual functions
+================================================================================
+
+class Foo {
+  virtual ~Foo() = 0;
+};
+
+--------------------------------------------------------------------------------
+
+(translation_unit
+  (class_specifier
+    (type_identifier)
+    (field_declaration_list
+      (function_definition
+        (function_declarator
+          (destructor_name
+            (identifier))
+          (parameter_list))
+        (pure_virtual_clause
+          (number_literal))))))

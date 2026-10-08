@@ -13007,8 +13007,13 @@
           "value": "="
         },
         {
-          "type": "PATTERN",
-          "value": "0"
+          "type": "ALIAS",
+          "content": {
+            "type": "PATTERN",
+            "value": "0"
+          },
+          "named": true,
+          "value": "number_literal"
         },
         {
           "type": "STRING",

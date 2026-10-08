@@ -6356,7 +6356,17 @@
   {
     "type": "pure_virtual_clause",
     "named": true,
-    "fields": {}
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "number_literal",
+          "named": true
+        }
+      ]
+    }
   },
   {
     "type": "qualified_identifier",
