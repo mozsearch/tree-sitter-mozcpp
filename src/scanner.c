@@ -520,14 +520,14 @@ static bool scan_following(TSLexer *lexer, unsigned *length, Following *followin
 /// careful not to take ordinary code.)
 static bool scan_macro_start(TSLexer *lexer, const bool *valid_symbols) {
     bool line_start = false;
-    if (valid_symbols[MACRO_LINE_START] || valid_symbols[MACRO_STATEMENT_START]) {
-        line_start = lexer->get_column(lexer) == 0;
-    }
+    // (The characters skipped on the line, for its column; see below.)
+    unsigned skipped = 0;
     while (iswspace(lexer->lookahead)) {
         if (lexer->lookahead == '\n') {
             line_start = true;
         }
         skip(lexer);
+        skipped++;
     }
     if (!is_macro_name_char(lexer->lookahead) || (lexer->lookahead >= '0' && lexer->lookahead <= '9')) {
         return false;
@@ -539,6 +539,14 @@ static bool scan_macro_start(TSLexer *lexer, const bool *valid_symbols) {
     scan_word(lexer, &length, name);
     if (!is_macro_name(name)) {
         return false;
+    }
+    // Whether the scan started at the start of a line, only for a macro's
+    // name, and from the column after it: tree-sitter's `get_column` reads
+    // the line from its start each token, so asking it at each statement
+    // made a long line's parse quadratic (a minute for each of LIR.h's 1 MB
+    // expansions of LIR_OPCODE_LIST, which are one line).
+    if (!line_start && (valid_symbols[MACRO_LINE_START] || valid_symbols[MACRO_STATEMENT_START])) {
+        line_start = lexer->get_column(lexer) == skipped + length;
     }
     if (!scan_rest_of_line_space(lexer, &length)) {
         return false;
